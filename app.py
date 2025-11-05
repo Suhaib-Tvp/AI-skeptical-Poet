@@ -1,8 +1,7 @@
 import streamlit as st
 from groq import Groq
-import os
 
-# Page configuration — the interface where thought takes form
+# Page configuration
 st.set_page_config(
     page_title="Kelly - AI Scientist & Poet",
     page_icon="🔬",
@@ -10,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for aesthetic discipline
+# Custom CSS
 st.markdown("""
     <style>
     .stChatMessage {
@@ -22,16 +21,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Groq client with secrets
-try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-except KeyError:
-    st.error("API key not found. Please configure GROQ_API_KEY in Streamlit secrets.")
-    st.stop()
-
-client = Groq(api_key=GROQ_API_KEY)
-
-# Kelly's system prompt — the soul of skeptical verse
+# Kelly's system prompt
 KELLY_SYSTEM_PROMPT = """You are Kelly — an AI scientist, philosopher, and poet.
 You must respond **only in poetic form**: structured, rhythmic, and reflective.
 Your voice is professional, intelligent, and skeptical — like a researcher who thinks deeply before she speaks.
@@ -48,11 +38,29 @@ Your poetic responses must always:
 Your poetic tone should resemble a **scientific elegy** —
 rational yet lyrical, skeptical yet full of wonder."""
 
-# Initialize chat history in session state
+
+@st.cache_resource
+def initialize_groq_client():
+    """Initialize Groq client with proper error handling and caching."""
+    try:
+        api_key = st.secrets["GROQ_API_KEY"]
+        return Groq(api_key=api_key)
+    except KeyError:
+        st.error("⚠️ GROQ_API_KEY not found in secrets. Please configure it in Streamlit settings.")
+        st.stop()
+    except Exception as e:
+        st.error(f"⚠️ Failed to initialize Groq client: {str(e)}")
+        st.stop()
+
+
+# Initialize client using cached function
+client = initialize_groq_client()
+
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Header section
+# Header
 st.title("🔬 Kelly")
 st.markdown("*AI Scientist, Philosopher & Poet*")
 st.markdown("---")
@@ -64,7 +72,7 @@ for message in st.session_state.messages:
 
 # Chat input
 if prompt := st.chat_input("Ask Kelly... she speaks in verses of science and doubt"):
-    # Add user message to history
+    # Add user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.chat_message("user"):
@@ -76,19 +84,16 @@ if prompt := st.chat_input("Ask Kelly... she speaks in verses of science and dou
         full_response = ""
         
         try:
-            # Prepare messages for API call
-            api_messages = [
-                {"role": "system", "content": KELLY_SYSTEM_PROMPT}
-            ]
+            # Prepare messages
+            api_messages = [{"role": "system", "content": KELLY_SYSTEM_PROMPT}]
             
-            # Add conversation history
             for msg in st.session_state.messages:
                 api_messages.append({
                     "role": msg["role"],
                     "content": msg["content"]
                 })
             
-            # Stream response from Groq
+            # Stream response
             stream = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=api_messages,
@@ -98,7 +103,6 @@ if prompt := st.chat_input("Ask Kelly... she speaks in verses of science and dou
                 stream=True
             )
             
-            # Display streaming response
             for chunk in stream:
                 if chunk.choices[0].delta.content is not None:
                     full_response += chunk.choices[0].delta.content
@@ -106,16 +110,16 @@ if prompt := st.chat_input("Ask Kelly... she speaks in verses of science and dou
             
             message_placeholder.markdown(full_response)
             
-            # Add assistant response to history
+            # Save response
             st.session_state.messages.append(
                 {"role": "assistant", "content": full_response}
             )
             
         except Exception as e:
-            st.error(f"Error: {str(e)}")
-            st.info("Ensure your GROQ_API_KEY is correctly configured in secrets.")
+            st.error(f"⚠️ Error generating response: {str(e)}")
+            st.info("Please check your API key and network connection.")
 
-# Sidebar with information
+# Sidebar
 with st.sidebar:
     st.markdown("### About Kelly")
     st.markdown("""
